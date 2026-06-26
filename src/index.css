@@ -1,0 +1,81 @@
+@import 'tailwindcss';
+@import '../node_modules/jsxgraph/distrib/jsxgraph.css';
+
+:root {
+  --bg: #F5F5F7;
+  --sidebar-bg: #FFFFFF;
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --card-bg: #FFFFFF;
+  --canvas-bg: #FFFFFF;
+  --input-bg: #F5F5F7;
+  --btn-bg: #E5E5EA;
+  --border: #E5E5EA;
+  --text: #1C1C1E;
+  --text-muted: #8E8E93;
+  --accent: #1C1C1E;
+  --accent-text: #FFFFFF;
+}
+
+:root.dark {
+  --bg: #1C1C1E;
+  --sidebar-bg: #2C2C2E;
+  --header-bg: rgba(44, 44, 46, 0.9);
+  --card-bg: #3A3A3C;
+  --canvas-bg: #2C2C2E;
+  --input-bg: #1C1C1E;
+  --btn-bg: #3A3A3C;
+  --border: #3A3A3C;
+  --text: #F5F5F7;
+  --text-muted: #8E8E93;
+  --accent: #F5F5F7;
+  --accent-text: #1C1C1E;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+.jxgbox {
+  border: none !important;
+  background: var(--canvas-bg) !important;
+  width: 100% !important;
+  height: 100% !important;
+  box-sizing: border-box;
+}
+
+.jxgbox svg text {
+  fill: var(--text-muted);
+}
+
+:root.dark .jxgbox {
+  background: var(--canvas-bg) !important;
+}
+
+:root.dark .jxgbox svg line,
+:root.dark .jxgbox svg path {
+  vector-effect: non-scaling-stroke;
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+@media (max-width: 768px) {
+  .jxgbox {
+    min-height: 50vh;
+  }
+}
