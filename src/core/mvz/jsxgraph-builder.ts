@@ -1,5 +1,5 @@
 import JXG from 'jsxgraph'
-import { evaluateFunction } from '../functions/plot'
+import { collectExprParams, evaluateFunction } from '../functions/plot'
 import { evalBoundFunction, getPointCoords } from '../functions/bind'
 import { graphTheme } from '../../utils/graphTheme'
 import type { MvzDocument, MvzElement, FunctionDef } from './types'
@@ -84,6 +84,15 @@ function liveDocFromPoints(doc: MvzDocument, jsxPoints: Record<string, GeoPoint>
   }
 }
 
+function paramScopeFromLive(live: MvzDocument, expr: string): Record<string, number> {
+  const scope: Record<string, number> = {}
+  for (const id of collectExprParams(expr)) {
+    const pt = getPointCoords(live, id)
+    if (pt) scope[id] = pt.x
+  }
+  return scope
+}
+
 function makeYFn(
   fn: FunctionDef,
   doc: MvzDocument,
@@ -97,7 +106,11 @@ function makeYFn(
       return y ?? NaN
     }
   }
-  return (x: number) => evaluateFunction(fn.expr, x) ?? NaN
+  return (x: number) => {
+    const live = liveDocFromPoints(doc, jsxPoints, baseIds)
+    const scope = paramScopeFromLive(live, fn.expr)
+    return evaluateFunction(fn.expr, x, scope) ?? NaN
+  }
 }
 
 function axisVectors(
@@ -216,38 +229,6 @@ function plotBoundCurve(
   )
 }
 
-function plotStaticFunction(board: Board, fn: FunctionDef, yFn: (x: number) => number, domain: [number, number], darkMode?: boolean) {
-  const t = graphTheme(darkMode)
-  const color = fn.color ?? t.stroke
-  const xs: number[] = []
-  const ys: number[] = []
-  const samples = 600
-  const flush = () => {
-    if (xs.length > 1) {
-      board.create('curve', [xs.slice(), ys.slice()], {
-        strokeColor: color,
-        strokeWidth: 2,
-        fixed: true,
-        highlight: false,
-        visible: isVisible(fn),
-      })
-      xs.length = 0
-      ys.length = 0
-    }
-  }
-  for (let i = 0; i <= samples; i++) {
-    const x = domain[0] + (domain[1] - domain[0]) * (i / samples)
-    const y = yFn(x)
-    if (Number.isFinite(y)) {
-      xs.push(x)
-      ys.push(y)
-    } else {
-      flush()
-    }
-  }
-  flush()
-}
-
 export interface BoardBuildResult {
   points: Record<string, GeoPoint>
   syncBasePointsToDoc: (doc: MvzDocument) => MvzDocument
@@ -349,12 +330,12 @@ export function buildMvzOnBoard(board: Board, doc: MvzDocument, darkMode?: boole
         const through = points[el.through]
         if (!through) break
         const baseLine = getLineForRef(board, el.to, points, lines)
-        board.create('parallel', [baseLine, through], {
+        lines[el.id] = board.create('parallel', [baseLine, through], {
           ...styleAttrs(el, darkMode),
           straightFirst: true,
           straightLast: true,
           fixed: true,
-        })
+        }) as GeoLine
         break
       }
 
@@ -480,14 +461,37 @@ export function buildMvzOnBoard(board: Board, doc: MvzDocument, darkMode?: boole
 
   for (const fn of doc.functions ?? []) {
     if (!isVisible(fn)) continue
-    const domain = fn.domain ?? [doc.viewport.xmin, doc.viewport.xmax]
-    const yFn = makeYFn(fn, doc, points, basePointIds)
     const color = fn.color ?? t.stroke
 
     if (fn.bind) {
       plotBoundCurve(board, fn, doc, points, basePointIds, color)
     } else {
-      plotStaticFunction(board, fn, yFn, domain, darkMode)
+      // Always use live functiongraph so letter-params (a,b,c…) update the curve while dragging.
+      board.create(
+        'functiongraph',
+        [
+          makeYFn(fn, doc, points, basePointIds),
+          () => {
+            const bb = board.getBoundingBox()
+            const span = bb[2] - bb[0]
+            return bb[0] - span
+          },
+          () => {
+            const bb = board.getBoundingBox()
+            const span = bb[2] - bb[0]
+            return bb[2] + span
+          },
+        ],
+        {
+          strokeColor: color,
+          strokeWidth: 2,
+          fixed: true,
+          needsRegularUpdate: true,
+          draggable: false,
+          highlight: false,
+          visible: isVisible(fn),
+        },
+      )
     }
   }
 

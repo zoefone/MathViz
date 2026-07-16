@@ -31,9 +31,7 @@ export function loadMvzFile(): Promise<string> {
 
 export function shareMvzUrl(doc: MvzDocument) {
   const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(doc))))
-  const url = `${window.location.origin}${window.location.pathname}#mvz=${encoded}`
-  navigator.clipboard?.writeText(url)
-  return url
+  return `${window.location.origin}${window.location.pathname}#mvz=${encoded}`
 }
 
 export function loadMvzFromHash(): MvzDocument | null {

@@ -74,8 +74,25 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-area-br {
+  margin-bottom: env(safe-area-inset-bottom, 0);
+  margin-right: env(safe-area-inset-right, 0);
+}
+
+.safe-area-hint {
+  margin-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-toast {
+  margin-bottom: env(safe-area-inset-bottom, 0);
+}
+
 @media (max-width: 768px) {
   .jxgbox {
-    min-height: 50vh;
+    min-height: 0;
   }
 }

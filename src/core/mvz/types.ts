@@ -41,6 +41,10 @@ export interface PointElement extends BaseElement {
   x: number
   y: number
   draggable?: boolean
+  /** Constrain this point to stay on the given function graph (glider). */
+  onFunction?: string
+  /** This point is the free end of the tangent line at `tangentFrom` on the same function. */
+  tangentFrom?: string
 }
 
 export interface SegmentElement extends BaseElement {

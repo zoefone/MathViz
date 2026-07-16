@@ -205,7 +205,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       drawTool: tool,
       pendingSegmentFrom: null,
       pendingPolygonVerts: [],
-      construction: null,
+      construction:
+        tool === 'perpendicular'
+          ? { tool: 'perpendicular' }
+          : tool === 'parallel'
+            ? { tool: 'parallel' }
+            : tool === 'midpoint'
+              ? { tool: 'midpoint', points: [] }
+              : tool === 'bisector'
+                ? { tool: 'bisector', points: [] }
+                : null,
       pendingAuxKind: null,
     }),
 

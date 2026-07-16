@@ -79,8 +79,15 @@ export function computeMvz(doc: MvzDocument): ComputedState {
       }
 
       case 'intersection': {
-        const l1 = resolveLinePoints(el.of[0], points as Record<string, ComputedPoint>)
-        const l2 = resolveLinePoints(el.of[1], points as Record<string, ComputedPoint>)
+        const resolve = (ref: string): [Vec2, Vec2] | null => {
+          const fromPts = resolveLinePoints(ref, points as Record<string, ComputedPoint>)
+          if (fromPts) return fromPts
+          const stored = lines.find((l) => l.id === ref)
+          if (stored) return [stored.p1, stored.p2]
+          return null
+        }
+        const l1 = resolve(el.of[0])
+        const l2 = resolve(el.of[1])
         if (!l1 || !l2) throw new Error(`Cannot resolve intersection refs`)
         const inter = lineIntersection(l1[0], l1[1], l2[0], l2[1])
         if (!inter) throw new Error(`Lines do not intersect: ${el.of.join(', ')}`)

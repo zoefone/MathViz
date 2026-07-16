@@ -1,8 +1,19 @@
 import { useMemo } from 'react'
 import { useAppStore } from '../stores/appStore'
 import { useSettingsStore } from '../stores/settingsStore'
+import { useToastStore } from '../stores/toastStore'
 import { latexToExpr, latexTemplates } from '../core/latex/parse'
 import { graphTheme } from '../utils/graphTheme'
+
+const DEFAULT_PARAM_X: Record<string, number> = {
+  a: 1,
+  b: -2,
+  c: -3,
+  h: 0,
+  k: 0,
+  m: 1,
+  n: 1,
+}
 
 export function LatexPanel() {
   const locale = useSettingsStore((s) => s.ui.locale)
@@ -11,6 +22,7 @@ export function LatexPanel() {
   const addFunction = useAppStore((s) => s.addFunction)
   const nextCustomId = useAppStore((s) => s.nextCustomId)
   const doc = useAppStore((s) => s.doc)
+  const toast = useToastStore((s) => s.show)
 
   const parsed = useMemo(() => latexToExpr(latexDraft), [latexDraft])
   const t = graphTheme()
@@ -24,19 +36,34 @@ export function LatexPanel() {
       color: t.stroke,
       visible: true,
     })
+    const ymin = doc.viewport.ymin
+    const sliderY = ymin + (doc.viewport.ymax - ymin) * 0.12
+    let slot = 0
     for (const p of parsed.params) {
-      const exists = doc.elements.some((e) => e.id === p)
+      const exists = useAppStore.getState().doc.elements.some((e) => e.id === p)
       if (!exists) {
+        const x0 = DEFAULT_PARAM_X[p] ?? 1
         useAppStore.getState().addElement({
           id: p,
           type: 'point',
-          x: 1,
-          y: 1,
-          label: p,
+          x: x0,
+          y: sliderY + slot * 0.45,
+          label: `${p}`,
           draggable: true,
         })
+        slot += 1
       }
     }
+    toast(
+      locale === 'zh'
+        ? parsed.params.length
+          ? `已渲染；拖动参数点 ${parsed.params.join(',')}（横移改值）`
+          : '已渲染到画布'
+        : parsed.params.length
+          ? `Rendered; drag ${parsed.params.join(',')} horizontally`
+          : 'Rendered to canvas',
+      'success',
+    )
   }
 
   return (
@@ -52,8 +79,8 @@ export function LatexPanel() {
       />
       <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
         {locale === 'zh'
-          ? '例如 f(x)=ax²+bx+c，支持参数滑块（用字母作参数）'
-          : 'e.g. f(x)=ax²+bx+c; letter params become draggable points'}
+          ? '字母参数会生成可拖动点：横向拖动改变参数值，曲线实时更新'
+          : 'Letter params become draggable points; drag horizontally to change the value'}
       </p>
 
       <div>
@@ -83,9 +110,7 @@ export function LatexPanel() {
             {locale === 'zh' ? '参数' : 'Params'}: {parsed.params.join(', ')}
           </div>
         )}
-        {parsed.error && (
-          <div style={{ color: '#FF453A' }}>{parsed.error}</div>
-        )}
+        {parsed.error && <div style={{ color: '#FF453A' }}>{parsed.error}</div>}
       </div>
 
       <button

@@ -9,11 +9,26 @@ export function preprocessExpr(expr: string): string {
     .replace(/(\))([a-zA-Z(])/g, '$1*$2')
 }
 
-export function evaluateFunction(expr: string, x: number): number | null {
+const RESERVED_SYMBOLS = new Set(['x', 'sin', 'cos', 'tan', 'log', 'sqrt', 'abs', 'pi', 'e'])
+
+/** Collect single-letter params from an expression (excludes x and built-ins). */
+export function collectExprParams(expr: string): string[] {
+  const params = new Set<string>()
+  for (const m of preprocessExpr(expr).matchAll(/\b([a-zA-Z])\b/g)) {
+    if (!RESERVED_SYMBOLS.has(m[1])) params.add(m[1])
+  }
+  return [...params].sort()
+}
+
+export function evaluateFunction(
+  expr: string,
+  x: number,
+  scope: Record<string, number> = {},
+): number | null {
   try {
     const node = math.parse(preprocessExpr(expr))
     const compiled = node.compile()
-    const y = compiled.evaluate({ x })
+    const y = compiled.evaluate({ x, ...scope })
     if (typeof y === 'number' && Number.isFinite(y)) return y
     if (y && typeof y === 'object' && 're' in y) {
       const re = (y as { re: number; im: number }).re
@@ -25,6 +40,20 @@ export function evaluateFunction(expr: string, x: number): number | null {
   } catch {
     return null
   }
+}
+
+/** Numerical derivative dy/dx at x. */
+export function numericalDerivative(
+  expr: string,
+  x: number,
+  scope: Record<string, number> = {},
+  h = 1e-4,
+): number | null {
+  const y0 = evaluateFunction(expr, x, scope)
+  const y1 = evaluateFunction(expr, x + h, scope)
+  if (y0 === null || y1 === null) return null
+  const d = (y1 - y0) / h
+  return Number.isFinite(d) ? d : null
 }
 
 export function sampleFunction(

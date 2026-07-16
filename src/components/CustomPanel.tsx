@@ -13,6 +13,10 @@ const drawTools: { id: DrawTool; label: string; labelEn: string }[] = [
   { id: 'circle', label: '圆', labelEn: 'Circle' },
   { id: 'polygon', label: '多边形', labelEn: 'Polygon' },
   { id: 'regularPolygon', label: '正多边形', labelEn: 'Regular' },
+  { id: 'midpoint', label: '中点', labelEn: 'Midpoint' },
+  { id: 'perpendicular', label: '垂线', labelEn: 'Perp' },
+  { id: 'parallel', label: '平行线', labelEn: 'Parallel' },
+  { id: 'bisector', label: '角平分线', labelEn: 'Bisector' },
 ]
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -52,10 +56,44 @@ export function CustomPanel() {
   const loadCustomTemplate = useAppStore((s) => s.loadCustomTemplate)
   const pendingAuxKind = useAppStore((s) => s.pendingAuxKind)
   const setPendingAuxKind = useAppStore((s) => s.setPendingAuxKind)
+  const construction = useAppStore((s) => s.construction)
 
   const selected = doc.elements.find((e) => e.id === selectedId)
   const sortedElements = sortElements(doc.elements)
   const pendingAuxItem = auxiliaryItems.find((i) => i.id === pendingAuxKind)
+
+  const constructionHint = (() => {
+    if (!construction) return null
+    if (construction.tool === 'midpoint') {
+      return locale === 'zh'
+        ? `中点：再点 ${2 - construction.points.length} 个点`
+        : `Midpoint: pick ${2 - construction.points.length} more point(s)`
+    }
+    if (construction.tool === 'bisector') {
+      return locale === 'zh'
+        ? `角平分线：依次点 臂1 → 顶点 → 臂2（已 ${construction.points.length}/3）`
+        : `Bisector: arm1 → vertex → arm2 (${construction.points.length}/3)`
+    }
+    if (construction.tool === 'perpendicular') {
+      return construction.from
+        ? locale === 'zh'
+          ? '垂线：再点击一条边/线段'
+          : 'Perp: click a segment'
+        : locale === 'zh'
+          ? '垂线：先点一点（过该点作垂线）'
+          : 'Perp: click a point first'
+    }
+    if (construction.tool === 'parallel') {
+      return construction.through
+        ? locale === 'zh'
+          ? '平行线：再点击一条边/线段'
+          : 'Parallel: click a segment'
+        : locale === 'zh'
+          ? '平行线：先点一点（过该点作平行线）'
+          : 'Parallel: click a point first'
+    }
+    return null
+  })()
 
   return (
     <div className="p-3 space-y-3 overflow-y-auto h-full text-sm">
@@ -152,15 +190,17 @@ export function CustomPanel() {
         </button>
       )}
 
-      {(pendingSegmentFrom || pendingPolygonVerts.length > 0) && (
+      {(pendingSegmentFrom || pendingPolygonVerts.length > 0 || constructionHint) && (
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          {pendingSegmentFrom
-            ? locale === 'zh'
-              ? '线段：已选起点，再点终点'
-              : 'Segment: pick end point'
-            : locale === 'zh'
-              ? `多边形：已点 ${pendingPolygonVerts.length} 个顶点（至少 3 个）`
-              : `Polygon: ${pendingPolygonVerts.length} vertices (min 3)`}
+          {constructionHint
+            ? constructionHint
+            : pendingSegmentFrom
+              ? locale === 'zh'
+                ? '线段：已选起点，再点终点'
+                : 'Segment: pick end point'
+              : locale === 'zh'
+                ? `多边形：已点 ${pendingPolygonVerts.length} 个顶点（至少 3 个）`
+                : `Polygon: ${pendingPolygonVerts.length} vertices (min 3)`}
         </p>
       )}
 
@@ -264,31 +304,37 @@ export function CustomPanel() {
         </div>
       </div>
 
-      {selected?.type === 'point' && (
+      {selected && (
         <div className="space-y-2 border-t pt-2" style={{ borderColor: 'var(--border)' }}>
-          <h3 className="text-xs font-semibold">{locale === 'zh' ? '点属性' : 'Point properties'}</h3>
-          <label className="flex items-center gap-2 text-xs">
-            x
-            <input
-              type="number"
-              step="0.1"
-              value={selected.x}
-              onChange={(e) => updateElement(selected.id, { x: Number(e.target.value) } as never)}
-              className="flex-1 px-2 py-1 rounded border text-xs"
-              style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}
-            />
-          </label>
-          <label className="flex items-center gap-2 text-xs">
-            y
-            <input
-              type="number"
-              step="0.1"
-              value={selected.y}
-              onChange={(e) => updateElement(selected.id, { y: Number(e.target.value) } as never)}
-              className="flex-1 px-2 py-1 rounded border text-xs"
-              style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}
-            />
-          </label>
+          <h3 className="text-xs font-semibold">
+            {locale === 'zh' ? '选中元素' : 'Selected'} · {elementLabel(selected, locale)}
+          </h3>
+          {selected.type === 'point' && (
+            <>
+              <label className="flex items-center gap-2 text-xs">
+                x
+                <input
+                  type="number"
+                  step="0.1"
+                  value={selected.x}
+                  onChange={(e) => updateElement(selected.id, { x: Number(e.target.value) } as never)}
+                  className="flex-1 px-2 py-1 rounded border text-xs"
+                  style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs">
+                y
+                <input
+                  type="number"
+                  step="0.1"
+                  value={selected.y}
+                  onChange={(e) => updateElement(selected.id, { y: Number(e.target.value) } as never)}
+                  className="flex-1 px-2 py-1 rounded border text-xs"
+                  style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}
+                />
+              </label>
+            </>
+          )}
           <button
             type="button"
             onClick={() => {

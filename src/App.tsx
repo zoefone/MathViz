@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect } from 'react'
+import { useEffect, useLayoutEffect, useState } from 'react'
 import { Toolbar } from './components/Toolbar'
 import { MathCanvas } from './components/MathCanvas'
 import { DarkModeToggle } from './components/DarkModeToggle'
@@ -9,6 +9,7 @@ import { CustomPanel } from './components/CustomPanel'
 import { LatexPanel } from './components/LatexPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SideNav } from './components/MobileBar'
+import { Toast } from './components/Toast'
 import { useAppStore } from './stores/appStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { loadMvzFromHash } from './utils/export'
@@ -34,12 +35,28 @@ function PanelContent() {
   }
 }
 
+function useIsMobile(breakpoint = 768) {
+  const [mobile, setMobile] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth < breakpoint,
+  )
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`)
+    const onChange = () => setMobile(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [breakpoint])
+  return mobile
+}
+
 export default function App() {
   const setDoc = useAppStore((s) => s.setDoc)
   const parseError = useAppStore((s) => s.parseError)
   const computeError = useAppStore((s) => s.computeError)
   const darkMode = useSettingsStore((s) => s.ui.darkMode)
   const locale = useSettingsStore((s) => s.ui.locale)
+  const isMobile = useIsMobile()
+  const [panelOpen, setPanelOpen] = useState(true)
 
   useLayoutEffect(() => {
     document.documentElement.classList.toggle('dark', darkMode)
@@ -55,35 +72,82 @@ export default function App() {
     }
   }, [setDoc])
 
-  return (
-    <div className="h-dvh flex flex-col md:flex-row overflow-hidden" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
-      {/* Left: nav + panel */}
-      <aside
-        className="flex flex-col w-full md:w-72 lg:w-80 shrink-0 border-b md:border-b-0 md:border-r max-h-[42vh] md:max-h-none"
-        style={{ borderColor: 'var(--border)', background: 'var(--sidebar-bg)' }}
-      >
-        <SideNav />
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <PanelContent />
-        </div>
-      </aside>
+  // On mobile, default to canvas-first after first paint on small screens
+  useEffect(() => {
+    if (isMobile) setPanelOpen(false)
+    else setPanelOpen(true)
+  }, [isMobile])
 
-      {/* Canvas */}
-      <main className="flex-1 min-w-0 relative flex flex-col">
-        <Toolbar />
-        <div className="flex-1 min-h-0 relative">
-        <DarkModeToggle />
-        <MathCanvas />
-        {!parseError && !computeError && (
-          <div
-            className="absolute bottom-3 left-3 text-xs px-2 py-1 rounded-lg pointer-events-none"
-            style={{ background: 'var(--card-bg)', color: 'var(--text-muted)' }}
-          >
-            {locale === 'zh' ? '拖拽点更新 · 滚轮缩放 · 拖动画布平移' : 'Drag points · Wheel zoom · Pan canvas'}
+  const showPanel = !isMobile || panelOpen
+
+  return (
+    <div
+      className="h-dvh flex flex-col md:flex-row overflow-hidden"
+      style={{ background: 'var(--bg)', color: 'var(--text)' }}
+    >
+      {showPanel && (
+        <aside
+          className="flex flex-col w-full md:w-72 lg:w-80 shrink-0 border-b md:border-b-0 md:border-r md:max-h-none"
+          style={{
+            borderColor: 'var(--border)',
+            background: 'var(--sidebar-bg)',
+            maxHeight: isMobile ? 'min(48vh, 420px)' : undefined,
+          }}
+        >
+          <div className="flex items-center gap-1 border-b shrink-0" style={{ borderColor: 'var(--border)' }}>
+            <div className="flex-1 min-w-0">
+              <SideNav />
+            </div>
+            {isMobile && (
+              <button
+                type="button"
+                className="mr-2 px-2.5 py-1.5 rounded-lg text-xs shrink-0"
+                style={{ background: 'var(--btn-bg)', color: 'var(--text)' }}
+                onClick={() => setPanelOpen(false)}
+              >
+                {locale === 'zh' ? '收起' : 'Hide'}
+              </button>
+            )}
           </div>
-        )}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <PanelContent />
+          </div>
+        </aside>
+      )}
+
+      <main className="flex-1 min-w-0 relative flex flex-col min-h-0">
+        <Toolbar
+          mobilePanelClosed={isMobile && !panelOpen}
+          onOpenPanel={() => setPanelOpen(true)}
+        />
+        <div className="flex-1 min-h-0 relative">
+          <DarkModeToggle />
+          <MathCanvas />
+          {!parseError && !computeError && (
+            <div
+              className="absolute bottom-3 left-3 text-xs px-2 py-1 rounded-lg pointer-events-none safe-area-hint"
+              style={{ background: 'var(--card-bg)', color: 'var(--text-muted)' }}
+            >
+              {locale === 'zh'
+                ? isMobile
+                  ? '拖点更新 · 双指缩放 · 拖动画布'
+                  : '拖拽点更新 · 滚轮缩放 · 拖动画布平移'
+                : isMobile
+                  ? 'Drag points · Pinch zoom · Pan'
+                  : 'Drag points · Wheel zoom · Pan canvas'}
+            </div>
+          )}
+          {(parseError || computeError) && (
+            <div
+              className="absolute top-3 left-3 right-14 text-xs px-3 py-2 rounded-lg z-10"
+              style={{ background: '#FF453A', color: '#fff' }}
+            >
+              {parseError || computeError}
+            </div>
+          )}
         </div>
       </main>
+      <Toast />
     </div>
   )
 }

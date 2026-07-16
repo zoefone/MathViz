@@ -82,6 +82,8 @@ export function extendLine(p1: Vec2, p2: Vec2, extent = 100): [Vec2, Vec2] {
 }
 
 export function parseSegmentRef(ref: string): [string, string] | null {
+  const explicit = ref.match(/^seg:([^|]+)\|([^|]+)$/)
+  if (explicit) return [explicit[1], explicit[2]]
   const m = ref.match(/^([A-Za-z0-9_]+)([A-Za-z0-9_]+)$/)
   if (!m) return null
   return [m[1], m[2]]
