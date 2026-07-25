@@ -5,6 +5,7 @@ import { t } from '../i18n'
 const tabs = [
   { id: 'presets' as const, labelKey: 'presets' as const },
   { id: 'custom' as const, labelKey: 'custom' as const },
+  { id: 'algebra' as const, labelKey: 'algebra' as const },
   { id: 'latex' as const, labelKey: 'latex' as const },
   { id: 'code' as const, labelKey: 'code' as const },
   { id: 'ai' as const, labelKey: 'ai' as const },

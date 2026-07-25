@@ -40,7 +40,10 @@ export function MathCanvas() {
   const drawTool = useAppStore((s) => s.drawTool)
   const pendingAuxKind = useAppStore((s) => s.pendingAuxKind)
   const darkMode = useSettingsStore((s) => s.ui.darkMode)
+  const showGrid = useSettingsStore((s) => s.ui.showGrid)
+  const showAxes = useSettingsStore((s) => s.ui.showAxes)
   const lastTheme = useRef(darkMode)
+  const boardChromeKey = `${showGrid}-${showAxes}`
 
   const initBoard = useCallback(
     (document: MvzDocument) => {
@@ -57,10 +60,12 @@ export function MathCanvas() {
       const drawing =
         useAppStore.getState().activePanel === 'custom' &&
         useAppStore.getState().drawTool !== 'select'
+      const ui = useSettingsStore.getState().ui
 
       const board = JXG.JSXGraph.initBoard(el, {
         boundingbox: [vp.xmin, vp.ymax, vp.xmax, vp.ymin],
-        axis: true,
+        axis: ui.showAxes,
+        grid: ui.showGrid,
         showNavigation: false,
         showCopyright: false,
         keepaspectratio: true,
@@ -85,7 +90,13 @@ export function MathCanvas() {
 
         pt.on('drag', () => {
           const state = useAppStore.getState()
-          const [cx, cy] = applyDragConstraint(id, pt.X(), pt.Y(), state.doc)
+          let x = pt.X()
+          let y = pt.Y()
+          if (useSettingsStore.getState().ui.snapToGrid) {
+            x = Math.round(x)
+            y = Math.round(y)
+          }
+          const [cx, cy] = applyDragConstraint(id, x, y, state.doc)
           if (Math.abs(cx - pt.X()) > 1e-9 || Math.abs(cy - pt.Y()) > 1e-9) {
             pt.setPositionDirectly(JXG.COORDS_BY_USER, [cx, cy])
           }
@@ -149,21 +160,20 @@ export function MathCanvas() {
         }
       })
     },
-    [syncDocFromBoard, darkMode],
+    [syncDocFromBoard, darkMode, boardChromeKey],
   )
 
   useEffect(() => {
     const themeChanged = lastTheme.current !== darkMode
     lastTheme.current = darkMode
-    if (themeChanged) {
-      lastStructureKey.current = ''
-    }
-    if (structureKey === lastStructureKey.current && boardRef.current && !themeChanged) {
+    if (themeChanged) lastStructureKey.current = ''
+    const keyed = `${structureKey}::${boardChromeKey}`
+    if (keyed === lastStructureKey.current && boardRef.current && !themeChanged) {
       updatePointPositions(jsxPointsRef.current, doc)
       boardRef.current.update()
       return
     }
-    lastStructureKey.current = structureKey
+    lastStructureKey.current = keyed
     initBoard(doc)
     return () => {
       if (boardRef.current) {
@@ -172,7 +182,7 @@ export function MathCanvas() {
         setBoardInstance(null)
       }
     }
-  }, [structureKey, doc, initBoard, darkMode])
+  }, [structureKey, doc, initBoard, darkMode, boardChromeKey])
 
   useEffect(() => {
     const board = boardRef.current
@@ -328,11 +338,52 @@ function ensurePoint(
   x: number,
   y: number,
 ): string {
-  const existing = pickVertexAt(state.doc, x, y, 0.35)
+  let px = x
+  let py = y
+  if (useSettingsStore.getState().ui.snapToGrid) {
+    px = Math.round(px)
+    py = Math.round(py)
+  }
+  const existing = pickVertexAt(state.doc, px, py, 0.35)
   if (existing) return existing
   const id = state.nextCustomId('P')
-  state.addElement({ id, type: 'point', x, y, label: id, draggable: true })
+  state.addElement({ id, type: 'point', x: px, y: py, label: id, draggable: true })
   return id
+}
+
+function lineRefFromPick(
+  state: ReturnType<typeof useAppStore.getState>,
+  x: number,
+  y: number,
+): string | null {
+  for (const el of state.doc.elements) {
+    if (el.type === 'line') {
+      const a = state.doc.elements.find((e) => e.id === el.through[0] && e.type === 'point')
+      const b = state.doc.elements.find((e) => e.id === el.through[1] && e.type === 'point')
+      if (a?.type === 'point' && b?.type === 'point') {
+        const d = distPointToLine(x, y, a.x, a.y, b.x, b.y)
+        if (d < 0.45) return el.id
+      }
+    }
+  }
+  const seg = pickSegmentAt(state.doc, x, y, 0.55)
+  if (seg) return `seg:${seg.between[0]}|${seg.between[1]}`
+  return null
+}
+
+function distPointToLine(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+): number {
+  const dx = bx - ax
+  const dy = by - ay
+  const len = Math.hypot(dx, dy)
+  if (len < 1e-12) return Math.hypot(px - ax, py - ay)
+  return Math.abs(dy * px - dx * py + bx * ay - by * ax) / len
 }
 
 function handleCustomDraw(
@@ -438,6 +489,99 @@ function handleCustomDraw(
       state.setConstruction({ tool: 'parallel' })
       toast(locale === 'zh' ? '已添加平行线' : 'Parallel added', 'success')
     }
+    return
+  }
+
+  if (state.drawTool === 'ray') {
+    const id = ensurePoint(state, x, y)
+    const step = state.construction
+    if (!step || step.tool !== 'ray' || !step.from) {
+      state.setConstruction({ tool: 'ray', from: id })
+      return
+    }
+    if (step.from === id) return
+    state.addElement({
+      id: state.nextCustomId('ray'),
+      type: 'ray',
+      from: step.from,
+      through: id,
+    })
+    state.setConstruction({ tool: 'ray' })
+    toast(locale === 'zh' ? '已添加射线' : 'Ray added', 'success')
+    return
+  }
+
+  if (state.drawTool === 'intersect') {
+    const ref = lineRefFromPick(state, x, y)
+    if (!ref) {
+      toast(locale === 'zh' ? '请点击直线或线段' : 'Click a line/segment', 'error')
+      return
+    }
+    const step = state.construction
+    const lines = step?.tool === 'intersect' ? [...step.lines, ref] : [ref]
+    if (lines.length < 2) {
+      state.setConstruction({ tool: 'intersect', lines })
+      return
+    }
+    state.addElement({
+      id: state.nextCustomId('I'),
+      type: 'intersection',
+      of: [lines[0], lines[1]],
+      label: 'I',
+    })
+    state.setConstruction({ tool: 'intersect', lines: [] })
+    toast(locale === 'zh' ? '已添加交点' : 'Intersection added', 'success')
+    return
+  }
+
+  if (state.drawTool === 'measureDistance') {
+    const pid = ensurePoint(state, x, y)
+    const step = state.construction
+    const points = step?.tool === 'measureDistance' ? [...step.points, pid] : [pid]
+    if (points.length < 2) {
+      state.setConstruction({ tool: 'measureDistance', points })
+      return
+    }
+    state.addAnnotation({
+      type: 'distance',
+      points: [points[0], points[1]],
+      label: `${points[0]}${points[1]}`,
+    })
+    state.setConstruction({ tool: 'measureDistance', points: [] })
+    toast(locale === 'zh' ? '已标注距离' : 'Distance marked', 'success')
+    return
+  }
+
+  if (state.drawTool === 'measureAngle') {
+    const pid = ensurePoint(state, x, y)
+    const step = state.construction
+    const points = step?.tool === 'measureAngle' ? [...step.points, pid] : [pid]
+    if (points.length < 3) {
+      state.setConstruction({ tool: 'measureAngle', points })
+      return
+    }
+    state.addAnnotation({
+      type: 'angle',
+      points: [points[0], points[1], points[2]],
+      label: `∠${points[1]}`,
+    })
+    state.setConstruction({ tool: 'measureAngle', points: [] })
+    toast(locale === 'zh' ? '已标注角度' : 'Angle marked', 'success')
+    return
+  }
+
+  if (state.drawTool === 'measureArea') {
+    const poly = pickPolygonAt(state.doc, x, y)
+    if (poly?.type !== 'polygon') {
+      toast(locale === 'zh' ? '请点击多边形内部' : 'Click inside a polygon', 'error')
+      return
+    }
+    state.addAnnotation({
+      type: 'area',
+      points: poly.vertices,
+      label: poly.label ?? poly.id,
+    })
+    toast(locale === 'zh' ? '已标注面积' : 'Area marked', 'success')
     return
   }
 

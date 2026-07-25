@@ -1,6 +1,7 @@
 import JXG from 'jsxgraph'
 import { collectExprParams, evaluateFunction } from '../functions/plot'
 import { evalBoundFunction, getPointCoords } from '../functions/bind'
+import { fmt } from '../measure/compute'
 import { graphTheme } from '../../utils/graphTheme'
 import type { MvzDocument, MvzElement, FunctionDef } from './types'
 
@@ -504,16 +505,68 @@ export function buildMvzOnBoard(board: Board, doc: MvzDocument, darkMode?: boole
         fixed: true,
       })
     }
+    if (ann.type === 'distance' && ann.points?.length === 2) {
+      const p1 = points[ann.points[0]]
+      const p2 = points[ann.points[1]]
+      if (p1 && p2) {
+        board.create(
+          'text',
+          [
+            () => (p1.X() + p2.X()) / 2,
+            () => (p1.Y() + p2.Y()) / 2 + 0.25,
+            () => fmt(Math.hypot(p2.X() - p1.X(), p2.Y() - p1.Y())),
+          ],
+          { fontSize: 13, strokeColor: t.label, fixed: true, cssClass: 'mvz-measure' },
+        )
+      }
+    }
     if (ann.type === 'angle' && ann.points?.length === 3) {
       const pts = ann.points.map((id) => points[id]).filter(Boolean)
       if (pts.length === 3) {
-        board.create('angle', pts, {
+        const [a, b, c] = pts as [GeoPoint, GeoPoint, GeoPoint]
+        board.create('angle', [a, b, c], {
           radius: 0.8,
           strokeColor: t.strokeMuted,
           fillColor: t.fill,
           fillOpacity: 0.3,
           fixed: true,
+          name: () => {
+            const v1x = a.X() - b.X()
+            const v1y = a.Y() - b.Y()
+            const v2x = c.X() - b.X()
+            const v2y = c.Y() - b.Y()
+            const n1 = Math.hypot(v1x, v1y)
+            const n2 = Math.hypot(v2x, v2y)
+            if (n1 < 1e-12 || n2 < 1e-12) return ''
+            let cos = (v1x * v2x + v1y * v2y) / (n1 * n2)
+            cos = Math.max(-1, Math.min(1, cos))
+            return `${fmt((Math.acos(cos) * 180) / Math.PI)}°`
+          },
+          withLabel: true,
         })
+      }
+    }
+    if (ann.type === 'area' && ann.points && ann.points.length >= 3) {
+      const verts = ann.points.map((id) => points[id]).filter(Boolean) as GeoPoint[]
+      if (verts.length >= 3) {
+        const cx = () => verts.reduce((s, p) => s + p.X(), 0) / verts.length
+        const cy = () => verts.reduce((s, p) => s + p.Y(), 0) / verts.length
+        board.create(
+          'text',
+          [
+            cx,
+            cy,
+            () => {
+              let sum = 0
+              for (let i = 0; i < verts.length; i++) {
+                const j = (i + 1) % verts.length
+                sum += verts[i].X() * verts[j].Y() - verts[j].X() * verts[i].Y()
+              }
+              return `S=${fmt(Math.abs(sum) / 2)}`
+            },
+          ],
+          { fontSize: 13, strokeColor: t.label, fixed: true },
+        )
       }
     }
   }

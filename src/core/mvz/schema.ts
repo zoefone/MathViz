@@ -15,6 +15,8 @@ const pointSchema = styleSchema.extend({
   y: z.number(),
   draggable: z.boolean().optional(),
   visible: z.boolean().optional(),
+  onFunction: z.string().optional(),
+  tangentFrom: z.string().optional(),
 })
 
 const segmentSchema = styleSchema.extend({
@@ -172,7 +174,7 @@ export const mvzSchema = z.object({
   annotations: z
     .array(
       z.object({
-        type: z.enum(['angle', 'label']),
+        type: z.enum(['angle', 'label', 'distance', 'area']),
         points: z.array(z.string()).optional(),
         at: z.string().optional(),
         label: z.string(),

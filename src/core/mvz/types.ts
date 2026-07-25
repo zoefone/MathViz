@@ -160,7 +160,7 @@ export interface FunctionDef {
 }
 
 export interface Annotation {
-  type: 'angle' | 'label'
+  type: 'angle' | 'label' | 'distance' | 'area'
   points?: string[]
   at?: string
   label: string

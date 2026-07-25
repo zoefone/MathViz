@@ -10,6 +10,7 @@ const drawTools: { id: DrawTool; label: string; labelEn: string }[] = [
   { id: 'point', label: '点', labelEn: 'Point' },
   { id: 'segment', label: '线段', labelEn: 'Segment' },
   { id: 'line', label: '直线', labelEn: 'Line' },
+  { id: 'ray', label: '射线', labelEn: 'Ray' },
   { id: 'circle', label: '圆', labelEn: 'Circle' },
   { id: 'polygon', label: '多边形', labelEn: 'Polygon' },
   { id: 'regularPolygon', label: '正多边形', labelEn: 'Regular' },
@@ -17,6 +18,10 @@ const drawTools: { id: DrawTool; label: string; labelEn: string }[] = [
   { id: 'perpendicular', label: '垂线', labelEn: 'Perp' },
   { id: 'parallel', label: '平行线', labelEn: 'Parallel' },
   { id: 'bisector', label: '角平分线', labelEn: 'Bisector' },
+  { id: 'intersect', label: '交点', labelEn: 'Intersect' },
+  { id: 'measureDistance', label: '测距', labelEn: 'Distance' },
+  { id: 'measureAngle', label: '测角', labelEn: 'Angle' },
+  { id: 'measureArea', label: '测面积', labelEn: 'Area' },
 ]
 
 function EyeIcon({ open }: { open: boolean }) {
@@ -63,7 +68,12 @@ export function CustomPanel() {
   const pendingAuxItem = auxiliaryItems.find((i) => i.id === pendingAuxKind)
 
   const constructionHint = (() => {
-    if (!construction) return null
+    if (!construction) {
+      if (drawTool === 'measureArea') {
+        return locale === 'zh' ? '测面积：点击多边形内部' : 'Area: click inside a polygon'
+      }
+      return null
+    }
     if (construction.tool === 'midpoint') {
       return locale === 'zh'
         ? `中点：再点 ${2 - construction.points.length} 个点`
@@ -91,6 +101,30 @@ export function CustomPanel() {
         : locale === 'zh'
           ? '平行线：先点一点（过该点作平行线）'
           : 'Parallel: click a point first'
+    }
+    if (construction.tool === 'intersect') {
+      return locale === 'zh'
+        ? `交点：再点 ${2 - construction.lines.length} 条边/直线`
+        : `Intersect: pick ${2 - construction.lines.length} more line(s)`
+    }
+    if (construction.tool === 'measureDistance') {
+      return locale === 'zh'
+        ? `测距：再点 ${2 - construction.points.length} 个点`
+        : `Distance: pick ${2 - construction.points.length} more point(s)`
+    }
+    if (construction.tool === 'measureAngle') {
+      return locale === 'zh'
+        ? `测角：依次点 臂1 → 顶点 → 臂2（已 ${construction.points.length}/3）`
+        : `Angle: arm1 → vertex → arm2 (${construction.points.length}/3)`
+    }
+    if (construction.tool === 'ray') {
+      return construction.from
+        ? locale === 'zh'
+          ? '射线：再点方向点'
+          : 'Ray: click direction point'
+        : locale === 'zh'
+          ? '射线：先点起点'
+          : 'Ray: click start point'
     }
     return null
   })()

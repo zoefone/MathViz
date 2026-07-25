@@ -16,6 +16,9 @@ export interface AiSettings {
 export interface UiSettings {
   darkMode: boolean
   locale: 'zh' | 'en'
+  showGrid: boolean
+  showAxes: boolean
+  snapToGrid: boolean
 }
 
 interface SettingsState {
@@ -46,7 +49,7 @@ export const useSettingsStore = create<SettingsState>()(
         model: PROVIDER_DEFAULTS.openai.model,
         localModel: 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC',
       },
-      ui: { darkMode: false, locale: 'zh' },
+      ui: { darkMode: false, locale: 'zh', showGrid: true, showAxes: true, snapToGrid: false },
 
       setAi: (partial) =>
         set((s) => {

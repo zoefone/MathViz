@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { MvzDocument, MvzElement, FunctionDef } from '../core/mvz/types'
+import type { MvzDocument, MvzElement, FunctionDef, Annotation } from '../core/mvz/types'
 import { computeMvz } from '../core/mvz/engine'
 import { getEmptyDoc, parseMvz, serializeMvz } from '../core/mvz/parser'
 import { applyFunctionBinds } from '../core/functions/bind'
@@ -16,6 +16,7 @@ export type DrawTool =
   | 'point'
   | 'segment'
   | 'line'
+  | 'ray'
   | 'circle'
   | 'polygon'
   | 'regularPolygon'
@@ -23,20 +24,36 @@ export type DrawTool =
   | 'parallel'
   | 'midpoint'
   | 'bisector'
+  | 'intersect'
+  | 'measureDistance'
+  | 'measureAngle'
+  | 'measureArea'
 
-export type ActivePanel = 'presets' | 'code' | 'ai' | 'settings' | 'custom' | 'latex'
+export type ActivePanel = 'presets' | 'code' | 'ai' | 'settings' | 'custom' | 'latex' | 'algebra'
 
 export type ConstructionStep =
   | { tool: 'perpendicular'; from?: string; to?: string }
   | { tool: 'parallel'; through?: string; to?: string }
   | { tool: 'midpoint'; points: string[] }
   | { tool: 'bisector'; points: string[] }
+  | { tool: 'intersect'; lines: string[] }
+  | { tool: 'measureDistance'; points: string[] }
+  | { tool: 'measureAngle'; points: string[] }
+  | { tool: 'ray'; from?: string }
   | null
 
 function structureKey(doc: MvzDocument): string {
   const elements = doc.elements.map((e) =>
     e.type === 'point'
-      ? { id: e.id, type: e.type, label: e.label, draggable: e.draggable, visible: e.visible }
+      ? {
+          id: e.id,
+          type: e.type,
+          label: e.label,
+          draggable: e.draggable,
+          visible: e.visible,
+          onFunction: e.onFunction,
+          tangentFrom: e.tangentFrom,
+        }
       : e,
   )
   return JSON.stringify({
@@ -101,6 +118,8 @@ interface AppState {
   loadCustomTemplate: (id: CustomTemplateId) => void
   setPendingAuxKind: (kind: AuxKind | null) => void
   applyAuxiliaryToTarget: (kind: AuxKind, target: AuxTarget) => void
+  addAnnotation: (ann: Annotation) => void
+  removeAnnotationAt: (index: number) => void
   getComputed: () => ReturnType<typeof computeMvz> | null
 }
 
@@ -214,7 +233,15 @@ export const useAppStore = create<AppState>((set, get) => ({
               ? { tool: 'midpoint', points: [] }
               : tool === 'bisector'
                 ? { tool: 'bisector', points: [] }
-                : null,
+                : tool === 'intersect'
+                  ? { tool: 'intersect', lines: [] }
+                  : tool === 'measureDistance'
+                    ? { tool: 'measureDistance', points: [] }
+                    : tool === 'measureAngle'
+                      ? { tool: 'measureAngle', points: [] }
+                      : tool === 'ray'
+                        ? { tool: 'ray' }
+                        : null,
       pendingAuxKind: null,
     }),
 
@@ -306,6 +333,20 @@ export const useAppStore = create<AppState>((set, get) => ({
   applyAuxiliaryToTarget: (kind, target) => {
     set(commitDoc(applyAuxiliaryToTarget(get().doc, kind, target), true, get()))
     set({ pendingAuxKind: null })
+  },
+
+  addAnnotation: (ann) => {
+    const doc = {
+      ...get().doc,
+      annotations: [...(get().doc.annotations ?? []), ann],
+    }
+    set(commitDoc(doc, true, get()))
+  },
+
+  removeAnnotationAt: (index) => {
+    const anns = [...(get().doc.annotations ?? [])]
+    anns.splice(index, 1)
+    set(commitDoc({ ...get().doc, annotations: anns }, true, get()))
   },
 
   getComputed: () => {

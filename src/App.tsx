@@ -7,6 +7,7 @@ import { AIPanel } from './components/AIPanel'
 import { PresetGallery } from './components/PresetGallery'
 import { CustomPanel } from './components/CustomPanel'
 import { LatexPanel } from './components/LatexPanel'
+import { AlgebraPanel } from './components/AlgebraPanel'
 import { SettingsPanel } from './components/SettingsPanel'
 import { SideNav } from './components/MobileBar'
 import { Toast } from './components/Toast'
@@ -29,6 +30,8 @@ function PanelContent() {
       return <CustomPanel />
     case 'latex':
       return <LatexPanel />
+    case 'algebra':
+      return <AlgebraPanel />
     case 'presets':
     default:
       return <PresetGallery />
@@ -77,6 +80,51 @@ export default function App() {
     if (isMobile) setPanelOpen(false)
     else setPanelOpen(true)
   }, [isMobile])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement)?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) return
+      const state = useAppStore.getState()
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && e.key.toLowerCase() === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) state.redo()
+        else state.undo()
+        return
+      }
+      if (mod && e.key.toLowerCase() === 'y') {
+        e.preventDefault()
+        state.redo()
+        return
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (state.selectedId) {
+          e.preventDefault()
+          state.removeElement(state.selectedId)
+          state.setSelectedId(null)
+        }
+        return
+      }
+      if (state.activePanel !== 'custom' && !['v', 'p', 's', 'l'].includes(e.key.toLowerCase())) return
+      const k = e.key.toLowerCase()
+      if (k === 'v') state.setDrawTool('select')
+      if (k === 'p') {
+        state.setActivePanel('custom')
+        state.setDrawTool('point')
+      }
+      if (k === 's') {
+        state.setActivePanel('custom')
+        state.setDrawTool('segment')
+      }
+      if (k === 'l') {
+        state.setActivePanel('custom')
+        state.setDrawTool('line')
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const showPanel = !isMobile || panelOpen
 

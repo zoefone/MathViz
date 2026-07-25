@@ -9,6 +9,7 @@ const LOCAL_MODELS = [
 
 export function SettingsPanel() {
   const locale = useSettingsStore((s) => s.ui.locale)
+  const ui = useSettingsStore((s) => s.ui)
   const ai = useSettingsStore((s) => s.ai)
   const setAi = useSettingsStore((s) => s.setAi)
   const setUi = useSettingsStore((s) => s.setUi)
@@ -144,6 +145,32 @@ export function SettingsPanel() {
         </select>
       </div>
 
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+          {locale === 'zh' ? '画布' : 'Canvas'}
+        </h4>
+        {(
+          [
+            ['showGrid', t(locale, 'showGrid')] as const,
+            ['showAxes', t(locale, 'showAxes')] as const,
+            ['snapToGrid', t(locale, 'snapToGrid')] as const,
+          ] as const
+        ).map(([key, label]) => (
+          <label key={key} className="flex items-center justify-between text-sm">
+            <span>{label}</span>
+            <input
+              type="checkbox"
+              checked={ui[key]}
+              onChange={(e) => setUi({ [key]: e.target.checked })}
+            />
+          </label>
+        ))}
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {locale === 'zh'
+            ? '快捷键：V 选择 · P 点 · S 线段 · L 直线 · Del 删除 · Ctrl+Z 撤销'
+            : 'Shortcuts: V select · P point · S segment · L line · Del delete · Ctrl+Z undo'}
+        </p>
+      </div>
     </div>
   )
 }
